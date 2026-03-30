@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WebRTC Chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+  <!-- Tela de entrada -->
+  <div id="tela-entrada">
+    <div class="card-entrada">
+      <h1>WebRTC Chat</h1>
+      <p>Entre em uma sala para conversar</p>
+      <input id="input-nome" type="text" placeholder="Seu nome" />
+      <input id="input-sala" type="text" placeholder="Nome da sala" value="sala1"/>
+      <button onclick="entrarNaSala()">Entrar</button>
+    </div>
+  </div>
+
+  <!-- Tela do chat -->
+  <div id="tela-chat" class="escondido">
+
+    <div class="lado-esquerdo">
+      <div class="videos">
+        <div class="video-wrap">
+          <video id="local-video" autoplay muted playsinline></video>
+          <span>Você</span>
+        </div>
+        <div class="video-wrap">
+          <video id="remote-video" autoplay playsinline></video>
+          <span>Remoto</span>
+        </div>
+      </div>
+
+      <div class="controles">
+        <button id="btn-mic" class="btn-ctrl desligado" onclick="toggleMic()">🎤</button>
+        <button class="btn-encerrar" onclick="encerrarChamada()">📵</button>
+        <button id="btn-cam" class="btn-ctrl desligado" onclick="toggleCam()">📷</button>
+      </div>
+    </div>
+
+    <div class="lado-direito">
+      <div class="chat-topo">
+        <strong id="label-sala">sala1</strong>
+        <span id="badge-status">Aguardando...</span>
+      </div>
+
+      <div id="mensagens"></div>
+
+      <div class="chat-rodape">
+        <input id="input-msg" type="text" placeholder="Mensagem..."
+          onkeydown="if(event.key==='Enter') enviarMensagem()"/>
+        <button onclick="enviarMensagem()">Enviar</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
