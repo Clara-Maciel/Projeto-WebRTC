@@ -7,13 +7,12 @@ let nomeUsuario = '';
 let nomeSala = '';
 let micAtivo = false;
 let camAtiva = false;
+let souOPrimeiro = false; // controla quem manda o offer
 
 const STUN = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 const telaEntrada  = document.getElementById('tela-entrada');
 const telaChat     = document.getElementById('tela-chat');
-const localVideo   = document.getElementById('local-video');
-const remoteVideo  = document.getElementById('remote-video');
 const mensagensDiv = document.getElementById('mensagens');
 const inputMsg     = document.getElementById('input-msg');
 const badgeStatus  = document.getElementById('badge-status');
@@ -32,7 +31,6 @@ async function entrarNaSala() {
 
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    // mic e câmera começam desligados
     localStream.getAudioTracks().forEach(t => t.enabled = false);
     localStream.getVideoTracks().forEach(t => t.enabled = false);
     document.getElementById('local-video').srcObject = localStream;
@@ -40,21 +38,13 @@ async function entrarNaSala() {
     msgSistema('Câmera/microfone não encontrado. Só o chat estará disponível.');
   }
 
-  socket.emit('join', nomeSala);
   document.getElementById('label-sala').textContent = sala;
-
   telaEntrada.classList.add('escondido');
   telaChat.classList.remove('escondido');
+  atualizarStatus('Aguardando outro usuário...');
 
-  // Inicia chamada automaticamente
-  criarPeerConnection();
-  dataChannel = pc.createDataChannel('chat');
-  configurarDataChannel(dataChannel);
-  if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  socket.emit('offer', { room: nomeSala, sdp: offer });
-  atualizarStatus('Aguardando...');
+  // Entra na sala — o servidor vai dizer se é o primeiro ou segundo
+  socket.emit('join', nomeSala);
 }
 
 // ===== CRIAR PEER CONNECTION =====
@@ -79,6 +69,8 @@ function criarPeerConnection() {
     if (pc.connectionState === 'connected')    atualizarStatus('Conectado', true);
     if (pc.connectionState === 'disconnected') atualizarStatus('Desconectado');
   };
+
+  if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 }
 
 // ===== DATA CHANNEL =====
@@ -94,7 +86,7 @@ function configurarDataChannel(channel) {
 // ===== ENCERRAR =====
 function encerrarChamada() {
   if (pc) { pc.close(); pc = null; }
-  if (localStream) { localStream.getTracks().forEach(t => t.stop()); }
+  if (localStream) localStream.getTracks().forEach(t => t.stop());
   socket.disconnect();
   location.reload();
 }
@@ -169,11 +161,30 @@ function atualizarStatus(texto, online = false) {
 }
 
 // ===== EVENTOS SOCKET =====
-socket.on('user-joined', () => msgSistema('Outro usuário entrou na sala.'));
 
+// Servidor avisa: você é o primeiro na sala, espera
+socket.on('primeiro-na-sala', () => {
+  souOPrimeiro = true;
+  msgSistema('Você entrou. Aguardando o outro usuário...');
+});
+
+// Servidor avisa: chegou um segundo usuário — quem é o primeiro manda o offer
+socket.on('user-joined', async () => {
+  msgSistema('Outro usuário entrou na sala.');
+  if (souOPrimeiro) {
+    criarPeerConnection();
+    dataChannel = pc.createDataChannel('chat');
+    configurarDataChannel(dataChannel);
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    socket.emit('offer', { room: nomeSala, sdp: offer });
+    atualizarStatus('Conectando...');
+  }
+});
+
+// Segundo peer recebe o offer e responde
 socket.on('offer', async (data) => {
   criarPeerConnection();
-  if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
   await pc.setRemoteDescription(data.sdp);
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
